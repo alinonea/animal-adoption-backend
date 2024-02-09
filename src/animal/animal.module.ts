@@ -6,14 +6,15 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
 @Module({
   providers: [AnimalService],
   controllers: [AnimalController],
-  imports:[ClientsModule.register([
+  imports:[
+    ClientsModule.register([
     {
       name: 'ANIMAL_KAFKA_SERVICE',
       transport: Transport.KAFKA,
       options: {
         client: {
           clientId: 'animal',
-          brokers: ['0.0.0.0:9093'],
+          brokers: ['kafka:9092'],
         },
         consumer: {
           groupId: 'animal-consumer'
@@ -26,7 +27,7 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
       name: 'ANIMAL_RABBIT_SERVICE',
       transport: Transport.RMQ,
       options: {
-        urls: ['amqp://0.0.0.0:5672'],
+        urls: ['amqp://rabbitmq:5672'],
         queue: "animals_queue",
         queueOptions: {
           durable: false

@@ -1,6 +1,51 @@
 version: '3.8'
 services:
-  dev-db:
+  animal-adoption-backend:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    command: npm run start
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    depends_on:
+      - kafka
+      - postgres
+      - rabbitmq
+    volumes:
+      - ./src:/usr/src/app/src
+    networks:
+      - animal-adoption-api
+  adoption-microservice:
+    build: 
+      context: ../adoption-microservice
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    depends_on:
+      - kafka
+      - postgres
+      - rabbitmq
+    volumes:
+      - ./src:/usr/src/app/src
+    networks:
+      - animal-adoption-api
+  animals-microservice:
+    build: 
+      context: ../animals-microservice
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    depends_on:
+      - kafka
+      - postgres
+      - rabbitmq
+    volumes:
+      - ./src:/usr/src/app/src
+    networks:
+      - animal-adoption-api
+  postgres:
     image: postgres:13
     ports:
       - 5435:5432
@@ -8,8 +53,11 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: animal-adoption-backend
+      POSTGRES_HOST: localhost
     networks:
       - animal-adoption-api
+    volumes:
+      - database_postgres:/var/lib/postgresql/data
   zookeeper:
     restart: always
     image: docker.io/bitnami/zookeeper:3.8
@@ -19,8 +67,12 @@ services:
       - "zookeeper-volume:/bitnami"
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
+      - ZOOKEEPER_CLIENT_PORT=2181
+    networks:
+      - animal-adoption-api
+    
   kafka:
-    restart: always
+    restart: on-failure
     image: docker.io/bitnami/kafka:3.3
     ports:
       - "9093:9093"
@@ -28,24 +80,39 @@ services:
       - "kafka-volume:/bitnami"
     environment:
       - KAFKA_BROKER_ID=1
-      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
       - ALLOW_PLAINTEXT_LISTENER=yes
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
       - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093
       - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://localhost:9093
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=CLIENT
+    networks:
+      - animal-adoption-api
     depends_on:
       - zookeeper
   rabbitmq:
         image: rabbitmq:3-management
+        healthcheck:
+            test: ["CMD", "rabbitmqctl", "status"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
         container_name: rabbitmq
         ports:
             - 5672:5672
-            - 15672:15672    
+            - 15672:15672
+        networks:
+          - animal-adoption-api
+        volumes:
+          - rabbitmq_data:/var/lib/rabbitmq
 
 networks:
   animal-adoption-api:
+    driver: bridge
 
 volumes:
   kafka-volume:
   zookeeper-volume:
+  database_postgres:
+  api:
+  rabbitmq_data:

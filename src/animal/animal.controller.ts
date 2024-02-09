@@ -1,4 +1,4 @@
-import { Controller, Get, Inject, Param, ParseIntPipe, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Inject, Param, ParseIntPipe, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtGuard } from 'src/auth/guard';
 import { AnimalService } from './animal.service';
 import { GetUser } from 'src/auth/decorator';
@@ -6,6 +6,8 @@ import { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
+import { CreateAnimalDto } from './dtos/create-animal.dto';
+import { User } from '@prisma/client';
 
 @UseGuards(JwtGuard)
 @Controller('animals')
@@ -23,19 +25,25 @@ export class AnimalController {
     // }
 
     @Post()
-    async saveAnimal(){
-        const animal = {id: 1, name: "cutzu"}
-        
-        const res = await this.rabbitClient.send("save_animal", JSON.stringify(animal))
-        
-       return res
+    async saveAnimal(@GetUser() user: User, @Body() createAnimalDto: CreateAnimalDto){
+        createAnimalDto['userId'] = user.id
+        // console.log(user)
+        const res = await this.rabbitClient.send("save_animal", JSON.stringify(createAnimalDto))
+        return res
+    }
+
+    @Get('/adoption')
+    async getAllToAdoptAnimals(){
+        const res = await this.rabbitClient.send("get_animals_to_adopt", "")
+        return res
     }
 
     @Post('/:id/adopt')
+    @HttpCode(200)
     adoptAnimal(@Param('id', ParseIntPipe) animalId: number){
         this.kafkaClient.emit<number>("adopt_animal",animalId);
         return {
-            "message": "Success",
+            "message": "Successfully adopted!",
             "code": 200
         }
     }
